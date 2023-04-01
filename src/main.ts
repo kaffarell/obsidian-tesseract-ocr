@@ -1,15 +1,18 @@
-import { App, Editor, FileSystemAdapter, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, Vault } from 'obsidian';
-import { exec, spawn } from 'child_process';
+import { App, FileSystemAdapter, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, Vault } from 'obsidian';
+import { spawn } from 'child_process';
 
 
-// Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
+interface PluginSettings {
 	imagePath: string;
+	tesseractLanguage: string;
+	debug: boolean;
 };
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	imagePath: 'Meta/Attachments'
+const DEFAULT_SETTINGS: PluginSettings = {
+	imagePath: 'Meta/Attachments',
+	tesseractLanguage: 'eng+deu',
+	debug: false
 }
 
 interface ImageLink {
@@ -17,17 +20,27 @@ interface ImageLink {
 	path: string;
 };
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class TesseractOcrPlugin extends Plugin {
+	settings: PluginSettings;
 
 	async onload() {
 		await this.loadSettings();
+		this.addSettingTab(new SettingsTab(this.app, this));
+
 
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'run-on-all-images',
-			name: 'Run tesseract on all images',
-			callback: () => {
+			id: 'run',
+			name: 'Run',
+			callback: async () => {
+				let startNotice = new Notice('Searching for image links...');
+				// Show status text in statusbar
+				const statusBarItemEl = this.addStatusBarItem();
+				statusBarItemEl.setText('Inserting details...');
+
+				let insertionCounter = 0;
+				let checkedFilesCounter = 0;
+
 				let allImages: TAbstractFile[] = [];
 				Vault.recurseChildren(app.vault.getRoot(), (file: TAbstractFile) => {
 					if(file.path.contains(this.settings.imagePath) && this.isImage(file.name)) {
@@ -35,43 +48,51 @@ export default class MyPlugin extends Plugin {
 					}
 				});
 				console.log(allImages.length + ' Images found!');
-				Vault.recurseChildren(app.vault.getRoot(), (file: TAbstractFile) => {
-					if(this.isMarkdown(file.name) && file.name == 'Gatter.md') {
+				let files = this.getAllFiles();
+
+				for(const file of files) {
+					if(this.isMarkdown(file.name)) {
+						checkedFilesCounter++;
+
 						let linkRegex = /!\[\[.*\]\](?!<details>)/g
-						this.app.vault.adapter.read(file.path).then(async content => {
-							let newContent = content;
-							// Search for ![[]] links in content that don't have details
-							let matches = this.getImageMatches(newContent.match(linkRegex), allImages);
+						let content = await this.app.vault.adapter.read(file.path)
+						let newContent = content;
+						// Search for ![[]] links in content that don't have details
+						let matches = this.getImageMatches(newContent.match(linkRegex), allImages);
 
-							if(matches.length !== 0) console.log('found ' + matches.length + ' images without details in file ' + file.name + ' processing...');
-							let errorCounter = 0;
+						if(matches.length !== 0) console.log('found ' + matches.length + ' images without details in file ' + file.name + ' processing...');
+						let errorCounter = 0;
 
-							for(let i = 0; i < matches.length; i++) {
-								// details don't exist yet, run tesseract
-								console.log('details dont exist on file: ' + file.name + ' link: ' + matches[i].match);
-								let index = (newContent.indexOf(matches[i].match) + matches[i].match.length);
-								try {
-									let text = await this.getTextFromImage(matches[i].path);
-									text = this.formatTesseractOutput(text);
+						for(let i = 0; i < matches.length; i++) {
+							// details don't exist yet, run tesseract
+							if (this.settings.debug == true) console.log('details dont exist on file: ' + file.name + ' link: ' + matches[i].match);
 
-									let detailsToAdd = '<details>' + text + '</details>\n';
-									newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
-								}catch(e) {
-									console.error(e);
-									errorCounter++;
-									let detailsToAdd = '<details></details>\n';
-									newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
-								}
+							let index = (newContent.indexOf(matches[i].match) + matches[i].match.length);
+							try {
+								let text = await this.getTextFromImage(matches[i].path);
+								text = this.formatTesseractOutput(text);
+
+								let detailsToAdd = '<details>' + text + '</details>\n';
+								newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
+							}catch(e) {
+								console.error(e);
+								errorCounter++;
+								let detailsToAdd = '<details></details>\n';
+								newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
 							}
-							if(content !== newContent) {
-								console.log('writing page!');
-								this.app.vault.adapter.write(file.path, newContent);
-							}
-							if(errorCounter > 0) console.log(errorCounter + ' errors encountered in this file: ' + file.name);
-						});
+							insertionCounter++;
+						}
+						if(content !== newContent) {
+							if (this.settings.debug == true) console.log('writing to note!');
+							this.app.vault.adapter.write(file.path, newContent);
+						}
+						if(errorCounter > 0) console.log(errorCounter + ' errors encountered in this file: ' + file.name);
 					}
-				});
-			}
+				};
+				statusBarItemEl.remove();
+				startNotice.hide();
+				let finishNotice = new Notice(`Done. Checked ${checkedFilesCounter} files and inserted ${insertionCounter} image descriptions.`);
+	 		}
 		});
 	}
 
@@ -85,6 +106,14 @@ export default class MyPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	private getAllFiles(): TAbstractFile[] {
+		let files: TAbstractFile[] = [];
+		Vault.recurseChildren(app.vault.getRoot(), (file: TAbstractFile) => { 
+			files.push(file);
+		});
+		return files;
 	}
 
 	private getImageMatches(list: RegExpMatchArray|null, allImages: TAbstractFile[]): ImageLink[] {
@@ -119,11 +148,12 @@ export default class MyPlugin extends Plugin {
 
 	private async getTextFromImage(filePath: string): Promise<string> {
 		let fullPath = (this.app.vault.adapter as FileSystemAdapter).getFullPath(filePath);
-		let command = `tesseract ${fullPath} - -l eng+deu`;
-		console.log('command to be run: ' + command);
+		let commandArgs = [fullPath, '-', '-l', this.settings.tesseractLanguage];
+
+		if (this.settings.debug == true) console.log('command to be run: ' + 'tesseract ' + commandArgs.join(' '));
 
 		return new Promise<string>((resolve, reject) => {
-			let execution = spawn('tesseract', [fullPath, '-', '-l', 'eng+deu']);
+			let execution = spawn('tesseract', commandArgs);
 
 			const error: string[] = [];
 			const stdout: string[] = [];
@@ -165,5 +195,52 @@ export default class MyPlugin extends Plugin {
 			}
 		});
 		return returnString;
+	}
+}
+
+class SettingsTab extends PluginSettingTab {
+	plugin: TesseractOcrPlugin;
+
+	constructor(app: App, plugin: TesseractOcrPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const {containerEl} = this;
+
+		containerEl.empty();
+
+		containerEl.createEl('h2', {text: 'Settings for obsidian-tesseract-ocr!'});
+
+		new Setting(containerEl)
+			.setName('Image Path')
+			.setDesc('Path to were all the images are stored (I recommend using the "Local Images Plus" plugin.')
+			.addText(text => text
+				.setPlaceholder('Enter relative path')
+				.setValue(this.plugin.settings.imagePath)
+				.onChange(async (value) => {
+					this.plugin.settings.imagePath = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Tesseract Language')
+			.setDesc('Language codes that improve tesseracts ocr. Make sure you have the language pack installed.')
+			.addText(text => text
+				.setPlaceholder('eng')
+				.setValue(this.plugin.settings.tesseractLanguage)
+				.onChange(async (value) => {
+					this.plugin.settings.tesseractLanguage = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Debug')
+			.setDesc('Shows debug output in console.')
+			.addToggle(text => text
+				.setValue(this.plugin.settings.debug)
+				.onChange(async (value) => {
+					this.plugin.settings.debug = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 }
