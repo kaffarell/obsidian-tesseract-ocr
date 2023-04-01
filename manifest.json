@@ -1,0 +1,11 @@
+{
+	"id": "obsidian-tesseract-ocr",
+	"name": "Obsidian Image OCR",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Runs ocr on pasted images and posts result in details box. This allows to search in images.",
+	"author": "kaffarell",
+	"authorUrl": "https://github.com/kaffarell",
+	"fundingUrl": "https://github.com/kaffarell",
+	"isDesktopOnly": false
+}
