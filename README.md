@@ -1,4 +1,4 @@
-# obsidian-tesseract-ocr
+# image-ocr
 
 Runs ocr on pasted images and posts result in details box.
 This also allows the images to be searchable.

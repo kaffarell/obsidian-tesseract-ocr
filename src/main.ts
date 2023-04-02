@@ -211,7 +211,7 @@ class SettingsTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for obsidian-tesseract-ocr!'});
+		containerEl.createEl('h2', {text: 'Settings for image-ocr!'});
 
 		new Setting(containerEl)
 			.setName('Image Path')
