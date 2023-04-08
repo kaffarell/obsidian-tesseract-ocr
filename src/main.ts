@@ -1,17 +1,20 @@
-import { App, FileSystemAdapter, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, Vault } from 'obsidian';
+import { App, FileSystemAdapter, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile, Vault } from 'obsidian';
 import { spawn } from 'child_process';
+import { Console } from 'console';
 
 
 
 interface PluginSettings {
 	imagePath: string;
 	tesseractLanguage: string;
+	tesseractPath: string;
 	debug: boolean;
 };
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	imagePath: 'Meta/Attachments',
 	tesseractLanguage: 'eng+deu',
+	tesseractPath: '',
 	debug: false
 }
 
@@ -43,7 +46,7 @@ export default class TesseractOcrPlugin extends Plugin {
 
 				let allImages: TAbstractFile[] = [];
 				Vault.recurseChildren(app.vault.getRoot(), (file: TAbstractFile) => {
-					if(file.path.contains(this.settings.imagePath) && this.isImage(file.name)) {
+					if(file.path.contains(this.settings.imagePath) && this.isImage(file)) {
 						allImages.push(file);
 					}
 				});
@@ -55,7 +58,7 @@ export default class TesseractOcrPlugin extends Plugin {
 						checkedFilesCounter++;
 
 						let linkRegex = /!\[\[.*\]\](?!<details>)/g
-						let content = await this.app.vault.adapter.read(file.path)
+						let content = await this.app.vault.cachedRead(file);
 						let newContent = content;
 						// Search for ![[]] links in content that don't have details
 						let matches = this.getImageMatches(newContent.match(linkRegex), allImages);
@@ -108,12 +111,15 @@ export default class TesseractOcrPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	private getAllFiles(): TAbstractFile[] {
-		let files: TAbstractFile[] = [];
-		Vault.recurseChildren(app.vault.getRoot(), (file: TAbstractFile) => { 
-			files.push(file);
-		});
-		return files;
+	private getAllFiles(): TFile[] {
+		let files = this.app.vault.getAllLoadedFiles();
+		let onlyFiles: TFile[] = [];
+		for(const f of files) {
+			if(f instanceof TFile) {
+				onlyFiles.push(f);
+			}
+		}
+		return onlyFiles;
 	}
 
 	private getImageMatches(list: RegExpMatchArray|null, allImages: TAbstractFile[]): ImageLink[] {
@@ -131,12 +137,8 @@ export default class TesseractOcrPlugin extends Plugin {
 		return newList;
 	}
 
-	private isImage(fileName: string): boolean {
-		if(['jpg','png','jpeg'].includes(fileName.split('.')[1])) {
-			return true;
-		}else {
-			return false;
-		}
+	private isImage(file: TAbstractFile): boolean {
+		return file instanceof TFile && ['jpg', 'png', 'jpeg'].includes(file.extension);
 	}
 	private isMarkdown(fileName: string): boolean {
 		if(['md'].includes(fileName.split('.')[1])) {
@@ -148,12 +150,13 @@ export default class TesseractOcrPlugin extends Plugin {
 
 	private async getTextFromImage(filePath: string): Promise<string> {
 		let fullPath = (this.app.vault.adapter as FileSystemAdapter).getFullPath(filePath);
+		let command = this.settings.tesseractPath + 'tesseract';
 		let commandArgs = [fullPath, '-', '-l', this.settings.tesseractLanguage];
 
-		if (this.settings.debug == true) console.log('command to be run: ' + 'tesseract ' + commandArgs.join(' '));
+		if (this.settings.debug == true) console.log('command to be run: ' + command + ' ' + commandArgs.join(' '));
 
 		return new Promise<string>((resolve, reject) => {
-			let execution = spawn('tesseract', commandArgs);
+			let execution = spawn(command, commandArgs);
 
 			const error: string[] = [];
 			const stdout: string[] = [];
@@ -189,6 +192,10 @@ export default class TesseractOcrPlugin extends Plugin {
 			}
 			// Remove > (this creates a quote and exits the details tag)
 			element = element.replace('>', '');
+
+			// Remove * (this creates a listed item)
+			element = element.replace('* ', '');
+
 			// Remove empty lines
 			if(element != '') {
 				returnString += element + '\n';
@@ -221,6 +228,16 @@ class SettingsTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.imagePath)
 				.onChange(async (value) => {
 					this.plugin.settings.imagePath = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Tesseract Path')
+			.setDesc('Tesseract executable path. Leave empty if tesseract is in the environment PATH variable.')
+			.addText(text => text
+				.setPlaceholder('')
+				.setValue(this.plugin.settings.tesseractPath)
+				.onChange(async (value) => {
+					this.plugin.settings.tesseractPath = value;
 					await this.plugin.saveSettings();
 				}));
 		new Setting(containerEl)
