@@ -190,8 +190,11 @@ export default class TesseractOcrPlugin extends Plugin {
 				// f.e. replace '1. ' with '1.'
 				element = element.replace(i + '. ', i + '.');
 			}
-			// Remove > (this creates a quote and exits the details tag)
-			element = element.replace('>', '');
+			// Replace > (this creates a quote and exits the details tag)
+			element = element.replace('>', '&gt;');
+
+			// Replace < (this opens a html tag)
+			element = element.replace('<', '&lt;');
 
 			// Remove * (this creates a listed item)
 			element = element.replace('* ', '');
