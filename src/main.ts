@@ -141,7 +141,7 @@ export default class TesseractOcrPlugin extends Plugin {
 		return file instanceof TFile && ['jpg', 'png', 'jpeg'].includes(file.extension);
 	}
 	private isMarkdown(fileName: string): boolean {
-		if(['md'].includes(fileName.split('.')[1])) {
+		if(['md'].includes(fileName.split('.')[fileName.split('.').length-1])) {
 			return true;
 		}else {
 			return false;
@@ -149,7 +149,7 @@ export default class TesseractOcrPlugin extends Plugin {
 	}
 
 	private async getTextFromImage(filePath: string): Promise<string> {
-		let fullPath = (this.app.vault.adapter as FileSystemAdapter).getFullPath(filePath);
+		let fullPath = "\"" + (this.app.vault.adapter as FileSystemAdapter).getFullPath(filePath) + "\"";
 		let command = this.settings.tesseractPath + 'tesseract';
 		let commandArgs = [fullPath, '-', '-l', this.settings.tesseractLanguage];
 
@@ -200,7 +200,7 @@ export default class TesseractOcrPlugin extends Plugin {
 			element = element.replace(gtReg, '&gt;');
 
 			// Remove * (this creates a listed item)
-			const starReg = new RegExp("\* ", "g");
+			const starReg = new RegExp("\\* ", "g");
 			element = element.replace(starReg, '');
 
 			// Remove empty lines
