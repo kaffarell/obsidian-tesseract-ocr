@@ -12,3 +12,5 @@ This also allows the images to be searchable.
 
 3) Execute the 'Run' command in Obsidian  
 4) Enjoy!
+
+Feel free to open issues if you need help setting it up!
