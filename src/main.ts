@@ -149,7 +149,7 @@ export default class TesseractOcrPlugin extends Plugin {
 	}
 
 	private async getTextFromImage(filePath: string): Promise<string> {
-		let fullPath = "\"" + (this.app.vault.adapter as FileSystemAdapter).getFullPath(filePath) + "\"";
+		let fullPath = (this.app.vault.adapter as FileSystemAdapter).getFullPath(filePath);
 		let command = this.settings.tesseractPath + 'tesseract';
 		let commandArgs = [fullPath, '-', '-l', this.settings.tesseractLanguage];
 
@@ -172,6 +172,8 @@ export default class TesseractOcrPlugin extends Plugin {
 			});
 
 			execution.on('close', () => {
+                if (this.settings.debug == true) console.log('tesseract output: ' + stdout.join(''));
+                if (this.settings.debug == true) console.log('tesseract output: ' + error.join(''));
 				if (error.length) reject(error.join(''));
 				else resolve(stdout.join(''));
 			});
