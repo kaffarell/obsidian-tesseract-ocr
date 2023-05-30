@@ -191,6 +191,8 @@ export default class TesseractOcrPlugin extends Plugin {
 			for(let i = 0; i < 10; i++) {
 				// f.e. replace '1. ' with '1.'
 				element = element.replace(i + '. ', i + '.');
+				// f.e. replace '1) ' with '1)'
+				element = element.replace(i + ') ', i + ')');
 			}
 
 			// Replace < (this opens a html tag)
@@ -204,6 +206,10 @@ export default class TesseractOcrPlugin extends Plugin {
 			// Remove * (this creates a listed item)
 			const starReg = new RegExp("\\* ", "g");
 			element = element.replace(starReg, '');
+
+			// Remove - (this creates a listed item)
+			const hyphenReg = new RegExp("- ", "g");
+			element = element.replace(hyphenReg, '');
 
 			// Remove empty lines
 			if(element != '') {
