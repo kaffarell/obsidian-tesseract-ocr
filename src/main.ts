@@ -13,7 +13,7 @@ interface PluginSettings {
 
 const DEFAULT_SETTINGS: PluginSettings = {
 	imagePath: 'Meta/Attachments',
-	tesseractLanguage: 'eng+deu',
+	tesseractLanguage: 'eng',
 	tesseractPath: '',
 	debug: false
 }
