@@ -1,6 +1,6 @@
 {
 	"name": "image-ocr",
-	"version": "0.3.7",
+	"version": "0.3.8",
 	"description": "Runs ocr on pasted images and posts result in details box. This allows to search in images.",
 	"main": "dist/main.js",
 	"scripts": {

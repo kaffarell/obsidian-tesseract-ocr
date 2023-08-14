@@ -174,7 +174,8 @@ export default class TesseractOcrPlugin extends Plugin {
 			execution.on('close', () => {
                 if (this.settings.debug == true) console.log('tesseract output: ' + stdout.join(''));
                 if (this.settings.debug == true) console.log('tesseract output: ' + error.join(''));
-				if (error.length) reject(error.join(''));
+				// if we don't get any output, reject
+				if (stdout.join('').length == 0) reject(error.join(''));
 				else resolve(stdout.join(''));
 			});
 
