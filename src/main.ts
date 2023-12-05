@@ -27,77 +27,98 @@ export default class TesseractOcrPlugin extends Plugin {
 	settings: PluginSettings;
 
 	async onload() {
-		await this.loadSettings();
-		this.addSettingTab(new SettingsTab(this.app, this));
+	    await this.loadSettings();
+	    this.addSettingTab(new SettingsTab(this.app, this));
 
+	    // Command for all Markdown files
+	    this.addCommand({
+	        id: 'run-all',
+	        name: 'Run on All Markdown Files',
+	        callback: () => {
+	            this.processFiles(this.getAllFiles());
+	        }
+	    });
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'run',
-			name: 'Run',
-			callback: async () => {
-				let startNotice = new Notice('Searching for image links...');
-				// Show status text in statusbar
-				const statusBarItemEl = this.addStatusBarItem();
-				statusBarItemEl.setText('Inserting details...');
-
-				let insertionCounter = 0;
-				let checkedFilesCounter = 0;
-
-				let allImages: TAbstractFile[] = [];
-				Vault.recurseChildren(app.vault.getRoot(), (file: TAbstractFile) => {
-					if(file.path.contains(this.settings.imagePath) && this.isImage(file)) {
-						allImages.push(file);
-					}
-				});
-				console.log(allImages.length + ' Images found!');
-				let files = this.getAllFiles();
-
-				for(const file of files) {
-					if(this.isMarkdown(file.name)) {
-						checkedFilesCounter++;
-
-						let linkRegex = /!\[\[.*\]\](?!<details>)/g
-						let content = await this.app.vault.cachedRead(file);
-						let newContent = content;
-						// Search for ![[]] links in content that don't have details
-						let matches = this.getImageMatches(newContent.match(linkRegex), allImages);
-
-						if(matches.length !== 0) console.log('found ' + matches.length + ' images without details in file ' + file.name + ' processing...');
-						let errorCounter = 0;
-
-						for(let i = 0; i < matches.length; i++) {
-							// details don't exist yet, run tesseract
-							if (this.settings.debug == true) console.log('details dont exist on file: ' + file.name + ' link: ' + matches[i].match);
-
-							let index = (newContent.indexOf(matches[i].match) + matches[i].match.length);
-							try {
-								let text = await this.getTextFromImage(matches[i].path);
-								text = this.formatTesseractOutput(text);
-
-								let detailsToAdd = text.trim().length ? "<details>" + text + "</details>\n" : "";
-								newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
-							}catch(e) {
-								console.error(e);
-								errorCounter++;
-								let detailsToAdd = '<details></details>\n';
-								newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
-							}
-							insertionCounter++;
-						}
-						if(content !== newContent) {
-							if (this.settings.debug == true) console.log('writing to note!');
-							this.app.vault.adapter.write(file.path, newContent);
-						}
-						if(errorCounter > 0) console.error(errorCounter + ' errors encountered in this file: ' + file.name);
-					}
-				};
-				statusBarItemEl.remove();
-				startNotice.hide();
-				let finishNotice = new Notice(`Done. Checked ${checkedFilesCounter} files and inserted ${insertionCounter} image descriptions.`);
-	 		}
-		});
+	    // Command for the current Markdown file
+	    this.addCommand({
+	        id: 'run-current',
+	        name: 'Run on Current Markdown File',
+	        callback: () => {
+	            const currentFile = this.app.workspace.getActiveFile();
+	            if (currentFile && this.isMarkdown(currentFile.name)) {
+	                this.processFiles([currentFile]);
+	            } else {
+	                new Notice('No Markdown file is currently active.');
+	            }
+	        }
+	    });
 	}
+
+	// ... [The rest of the code above remains unchanged]
+
+	// Extracted method to process files
+	private async processFiles(files: TFile[]) {
+	    let startNotice = new Notice('Searching for image links...');
+	    // Show status text in statusbar
+	    const statusBarItemEl = this.addStatusBarItem();
+	    statusBarItemEl.setText('Inserting details...');
+
+	    let insertionCounter = 0;
+	    let checkedFilesCounter = 0;
+
+	    let allImages: TAbstractFile[] = [];
+	    Vault.recurseChildren(app.vault.getRoot(), (file: TAbstractFile) => {
+	        if(file.path.contains(this.settings.imagePath) && this.isImage(file)) {
+	            allImages.push(file);
+	        }
+	    });
+	    console.log(allImages.length + ' Images found!');
+
+	    for(const file of files) {
+			if(this.isMarkdown(file.name)) {
+				checkedFilesCounter++;
+
+				let linkRegex = /!\[\[.*\]\](?!<details>)/g
+				let content = await this.app.vault.cachedRead(file);
+				let newContent = content;
+				// Search for ![[]] links in content that don't have details
+				let matches = this.getImageMatches(newContent.match(linkRegex), allImages);
+
+				if(matches.length !== 0) console.log('found ' + matches.length + ' images without details in file ' + file.name + ' processing...');
+				let errorCounter = 0;
+
+				for(let i = 0; i < matches.length; i++) {
+					// details don't exist yet, run tesseract
+					if (this.settings.debug == true) console.log('details dont exist on file: ' + file.name + ' link: ' + matches[i].match);
+
+					let index = (newContent.indexOf(matches[i].match) + matches[i].match.length);
+					try {
+						let text = await this.getTextFromImage(matches[i].path);
+						text = this.formatTesseractOutput(text);
+
+						let detailsToAdd = text.trim().length ? "<details>" + text + "</details>\n" : "";
+						newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
+					}catch(e) {
+						console.error(e);
+						errorCounter++;
+						let detailsToAdd = '<details></details>\n';
+						newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
+					}
+					insertionCounter++;
+				}
+				if(content !== newContent) {
+					if (this.settings.debug == true) console.log('writing to note!');
+					this.app.vault.adapter.write(file.path, newContent);
+				}
+				if(errorCounter > 0) console.error(errorCounter + ' errors encountered in this file: ' + file.name);
+			}
+		};
+
+	    statusBarItemEl.remove();
+	    startNotice.hide();
+	    let finishNotice = new Notice(`Done. Checked ${checkedFilesCounter} files and inserted ${insertionCounter} image descriptions.`);
+	}
+
 
 	onunload() {
 
