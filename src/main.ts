@@ -75,7 +75,7 @@ export default class TesseractOcrPlugin extends Plugin {
 								let text = await this.getTextFromImage(matches[i].path);
 								text = this.formatTesseractOutput(text);
 
-								let detailsToAdd = '<details>' + text + '</details>\n';
+								let detailsToAdd = text.trim().length ? "<details>" + text + "</details>\n" : "";
 								newContent = newContent.slice(0,index) + detailsToAdd + newContent.slice(index);
 							}catch(e) {
 								console.error(e);
