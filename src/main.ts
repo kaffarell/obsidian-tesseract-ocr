@@ -78,9 +78,25 @@ export default class TesseractOcrPlugin extends Plugin {
 			if(this.isMarkdown(file.name)) {
 				checkedFilesCounter++;
 
-				let linkRegex = /!\[\[.*\]\](?!<details>)/g
-				let content = await this.app.vault.cachedRead(file);
-				let newContent = content;
+		        let content = await this.app.vault.cachedRead(file);
+		        let newContent = content;
+
+		        // Define regex for relative legacy links that contain the linkPath
+				let regexPattern = `\\[.*?\\]\\((.*?)(${this.settings.imagePath}.*?\\..*?)\\)`;
+				let legacyLinkRegex = new RegExp(regexPattern, 'g'); // 'g' for global replacement
+
+				// Convert legacy links to absolute wiki style links
+				newContent = newContent.replace(legacyLinkRegex, (match, beforePath, imagePath) => {
+				    if (this.settings.debug == true) console.log(match, beforePath, imagePath);
+				    // Use the imagePath directly since it already contains the path from this.settings.imagePath onwards
+				    return `[[${unescape(imagePath)}]]`;
+				});
+
+
+		        // Now process the content with the existing code to search for images without details
+		        // This uses the updated newContent where legacy links have been converted
+		        let linkRegex = /!\[\[.*\]\](?!<details>)/g;
+
 				// Search for ![[]] links in content that don't have details
 				let matches = this.getImageMatches(newContent.match(linkRegex), allImages);
 
