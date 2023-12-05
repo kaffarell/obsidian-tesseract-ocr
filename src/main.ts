@@ -89,7 +89,7 @@ export default class TesseractOcrPlugin extends Plugin {
 							if (this.settings.debug == true) console.log('writing to note!');
 							this.app.vault.adapter.write(file.path, newContent);
 						}
-						if(errorCounter > 0) console.log(errorCounter + ' errors encountered in this file: ' + file.name);
+						if(errorCounter > 0) console.error(errorCounter + ' errors encountered in this file: ' + file.name);
 					}
 				};
 				statusBarItemEl.remove();
