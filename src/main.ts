@@ -172,11 +172,15 @@ export default class TesseractOcrPlugin extends Plugin {
 			});
 
 			execution.on('close', () => {
-                if (this.settings.debug == true) console.log('tesseract output: ' + stdout.join(''));
-                if (this.settings.debug == true) console.log('tesseract output: ' + error.join(''));
-				// if we don't get any output, reject
-				if (stdout.join('').length == 0) reject(error.join(''));
-				else resolve(stdout.join(''));
+                if (this.settings.debug == true)
+		          console.log("tesseract stdout: " + stdout.join(""));
+		        if (this.settings.debug == true)
+		          console.log("tesseract stderr: " + error.join(""));
+		        if (stdout.join("").length == 0)
+		          // reject if we dont get any output
+		          reject(error.join(""));
+		        else
+		          resolve(stdout.join(""));
 			});
 
 		});
