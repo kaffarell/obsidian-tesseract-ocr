@@ -151,7 +151,7 @@ export default class TesseractOcrPlugin extends Plugin {
 	private async getTextFromImage(filePath: string): Promise<string> {
 		let fullPath = (this.app.vault.adapter as FileSystemAdapter).getFullPath(filePath);
 		let command = this.settings.tesseractPath + 'tesseract';
-		let commandArgs = [fullPath, '-', '-l', this.settings.tesseractLanguage];
+		let commandArgs = [`${fullPath.replace(/ /g, '\ ')}`, "-", "-l", this.settings.tesseractLanguage];
 
 		if (this.settings.debug == true) console.log('command to be run: ' + command + ' ' + commandArgs.join(' '));
 
